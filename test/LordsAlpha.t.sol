@@ -78,6 +78,9 @@ contract LordsAlphaTest is Test {
         vm.warp(startTime + 2 days);
         for (uint256 i = 0; i < _addresses.length; i++) {
             address _address = _addresses[i];
+            uint size;
+            assembly { size := extcodesize(_address) }
+            vm.assume(size == 0);
             vm.assume(_address != address(0));
             vm.assume(!seenAddresses[_address]);
             hoax(_address);
