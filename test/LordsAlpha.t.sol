@@ -5,6 +5,9 @@ import "forge-std/Test.sol";
 import "../src/LordsAlpha.sol";
 
 contract LordsAlphaTest is Test {
+    function onERC1155Received(address, address, uint256, uint256, bytes memory) public pure returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
     LordsAlpha public lordsalpha;
     bytes32 root1 = 0x3e82b7d669c35b1793116c650619d6ad9d8ed8bafb2ec0d1d614fe4f333ad9d5;
     bytes32 root2 = 0x538d0c15fdbd4471a38ba784f90b5a13c7d7ba84e4ad3ba96f0b8f984f13cafb;
@@ -25,38 +28,50 @@ contract LordsAlphaTest is Test {
     }
 
     function testInitialization() public {
-        assertEq(lordsalpha.INITIAL_MAX_SUPPLY(), uint256(500));
-        assertEq(lordsalpha.MINT_PRICE(), 0.15 ether);
+        assertEq(lordsalpha.MAX_SUPPLY(), uint256(555));
+        assertEq(lordsalpha.MINT_PRICE(), 0.18 ether);
+        assertEq(lordsalpha.MAX_PER_WALLET_PER_PHASE(), 2);
+        assertEq(lordsalpha.MINIMUM_TIME_STAKED_FOR_PREMIUM_REDEMPTION(), 7776000);
+        assertEq(lordsalpha.totalSupply(1), 55);
+        assertEq(lordsalpha.balanceOf(address(this), 1), 55);
+        (bytes32 _root1, uint64 _startTime1, uint64 _endTime1) = lordsalpha.phaseOneDetails();
+        (bytes32 _root2, uint64 _startTime2, uint64 _endTime2) = lordsalpha.phaseTwoDetails();
+        assertEq(_root1, root1);
+        assertEq(_root2, root2);
+        assertEq(_startTime1, startTime);
+        assertEq(_endTime1, startTime + 7200); // 2 hrs = 7200 sec
+        assertEq(_startTime2, startTime + 7200); // phase one ends and phase 2 begins during same block
+        assertEq(_endTime2, startTime + 86400); // public starts one day after startTime 
     }
 
     function testMintAllowlistFailures() public {
         // public has not started yet
         hoax(add1);
         vm.expectRevert(AllowlistSaleNotActive.selector);
-        lordsalpha.mintAllowlist{value: 0.3 ether}(proof1, 2);
+        lordsalpha.mintAllowlist{value: 0.36 ether}(proof1, 2);
 
         // invalid proof
         vm.warp(startTime + 60);
         hoax(address(5));
         vm.expectRevert(InvalidProof.selector);
-        lordsalpha.mintAllowlist{value: 0.3 ether}(proof1, 2);
+        lordsalpha.mintAllowlist{value: 0.36 ether}(proof1, 2);
 
         // wrong value sent
         hoax(add1);
         vm.expectRevert(WrongValueSent.selector);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 2);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 2);
 
         // exceeds max per wallet
         startHoax(add1);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 1);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 1);
         vm.expectRevert(ExceedMaxPerWallet.selector);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 1);
 
         // not bypassable by transfers
         lordsalpha.safeTransferFrom(add1, address(5), 1, 2, "");
         vm.expectRevert(ExceedMaxPerWallet.selector);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 1);
     }
 
     function testMintMaxSupply(address[250] memory _addresses) public {
@@ -66,14 +81,14 @@ contract LordsAlphaTest is Test {
             vm.assume(_address != address(0));
             vm.assume(!seenAddresses[_address]);
             hoax(_address);
-            lordsalpha.mintPublic{value: 0.3 ether}(2);
+            lordsalpha.mintPublic{value: 0.36 ether}(2);
             seenAddresses[_address] = true;
         }
 
         vm.assume(!seenAddresses[address(7)]);
         hoax(address(7));
         vm.expectRevert(ExceedMaxSupply.selector);
-        lordsalpha.mintPublic{value: 0.15 ether}(1);
+        lordsalpha.mintPublic{value: 0.18 ether}(1);
     }
 
     function testMintPublicFailures() public {
@@ -81,87 +96,87 @@ contract LordsAlphaTest is Test {
         vm.warp(startTime + 1 hours);
         startHoax(add1);
         vm.expectRevert(PublicSaleNotStarted.selector);
-        lordsalpha.mintPublic{value: 0.3 ether}(2);
+        lordsalpha.mintPublic{value: 0.36 ether}(2);
 
         // during phase 2 window
         vm.warp(startTime + 3 hours);
         vm.expectRevert(PublicSaleNotStarted.selector);
-        lordsalpha.mintPublic{value: 0.3 ether}(2);
+        lordsalpha.mintPublic{value: 0.36 ether}(2);
         
         // during public window
         vm.warp(startTime + 25 hours);
 
         // wrong value sent
         vm.expectRevert(WrongValueSent.selector);
-        lordsalpha.mintPublic{value: 0.15 ether}(2);
+        lordsalpha.mintPublic{value: 0.18 ether}(2);
 
         // exceeds max per wallet
-        lordsalpha.mintPublic{value: 0.15 ether}(1);
-        lordsalpha.mintPublic{value: 0.15 ether}(1);
+        lordsalpha.mintPublic{value: 0.18 ether}(1);
+        lordsalpha.mintPublic{value: 0.18 ether}(1);
         vm.expectRevert(ExceedMaxPerWallet.selector);
-        lordsalpha.mintPublic{value: 0.15 ether}(1);
+        lordsalpha.mintPublic{value: 0.18 ether}(1);
     }
 
     function testSingleMintAllowList() public {
         vm.warp(startTime);
         hoax(add1);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 1);
         hoax(add1);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 1);
 
         hoax(add2);
         vm.expectRevert(InvalidProof.selector);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof2, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof2, 1);
 
         vm.warp(startTime + 3 hours);
         hoax(add2);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof2, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof2, 1);
         hoax(add2);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof2, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof2, 1);
 
         hoax(add1);
         vm.expectRevert(InvalidProof.selector);
-        lordsalpha.mintAllowlist{value: 0.15 ether}(proof1, 1);
+        lordsalpha.mintAllowlist{value: 0.18 ether}(proof1, 1);
 
         assertEq(lordsalpha.balanceOf(add2, 1), 2);
         assertEq(lordsalpha.balanceOf(add1, 1), 2);
-        assertEq(lordsalpha.totalSupply(1), 4);
+        assertEq(lordsalpha.totalSupply(1), 59);
     }
 
     function testMultipleMintAllowList() public {
         vm.warp(startTime);
         hoax(add1);
-        lordsalpha.mintAllowlist{value: 0.3 ether}(proof1, 2);
+        lordsalpha.mintAllowlist{value: 0.36 ether}(proof1, 2);
 
         hoax(add2);
         vm.expectRevert(InvalidProof.selector);
-        lordsalpha.mintAllowlist{value: 0.3 ether}(proof2, 2);
+        lordsalpha.mintAllowlist{value: 0.36 ether}(proof2, 2);
 
         vm.warp(startTime + 3 hours);
         hoax(add2);
-        lordsalpha.mintAllowlist{value: 0.3 ether}(proof2, 2);
+        lordsalpha.mintAllowlist{value: 0.36 ether}(proof2, 2);
 
         hoax(add1);
         vm.expectRevert(InvalidProof.selector);
-        lordsalpha.mintAllowlist{value: 0.3 ether}(proof1, 2);
+        lordsalpha.mintAllowlist{value: 0.36 ether}(proof1, 2);
 
         assertEq(lordsalpha.balanceOf(add2, 1), 2);
         assertEq(lordsalpha.balanceOf(add1, 1), 2);
-        assertEq(lordsalpha.totalSupply(1), 4);
+        assertEq(lordsalpha.totalSupply(1), 59);
     }
 
     function testMintPublic() public {
         vm.warp(startTime + 24 hours);
 
         hoax(address(5));
-        lordsalpha.mintPublic{value: 0.3 ether}(2);
+        lordsalpha.mintPublic{value: 0.36 ether}(2);
     }
 
     function testStake() public {
         uint256 stakeStartTime = startTime + 24 hours;
         vm.warp(stakeStartTime);
         startHoax(address(5));
-        lordsalpha.mintPublic{value: 0.3 ether}(2);
+        lordsalpha.mintPublic{value: 0.36 ether}(2);
 
         // stake one
         lordsalpha.stakeAlphaPass(1);
@@ -182,7 +197,7 @@ contract LordsAlphaTest is Test {
         // stake 2
         changePrank(address(4));
         vm.deal(address(4), 1 ether);
-        lordsalpha.mintPublic{value: 0.3 ether}(2);
+        lordsalpha.mintPublic{value: 0.36 ether}(2);
 
         lordsalpha.stakeAlphaPass(2);
         assertEq(lordsalpha.balanceOf(address(4), 1), 0);
@@ -194,10 +209,10 @@ contract LordsAlphaTest is Test {
         // stake more than 2
         changePrank(address(6));
         vm.deal(address(6), 1 ether);
-        lordsalpha.mintPublic{value: 0.3 ether}(2);
+        lordsalpha.mintPublic{value: 0.36 ether}(2);
         changePrank(address(7));
         vm.deal(address(7), 1 ether);
-        lordsalpha.mintPublic{value: 0.3 ether}(2);
+        lordsalpha.mintPublic{value: 0.36 ether}(2);
         lordsalpha.safeTransferFrom(address(7), address(6), 1, 2, "");
 
         uint256 newTime = 1667019537;

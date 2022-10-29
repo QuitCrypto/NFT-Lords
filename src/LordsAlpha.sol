@@ -33,18 +33,18 @@ struct NumberMintedPerPhase {
 }
 
 contract LordsAlpha is ERC1155Guardable, Ownable {
-    /** @notice INITIAL_MAX_SUPPLY refers to the max supply that is available for the initial mint.
-      * the final max supply will be 777, and will be set at a later date. This transition from 500
+    /** @notice MAX_SUPPLY refers to the max supply that is available for the initial mint.
+      * the final max supply will be 777, and will be set at a later date. This transition from 555
       * to 777 can happen only once, and the max supply can never exceed 777.
     **/
-    uint256 public INITIAL_MAX_SUPPLY = 500;
+    uint256 public MAX_SUPPLY = 555;
     uint256 private constant FINAL_MAX_SUPPLY = 777;
-    uint256 public constant MINT_PRICE = 0.15 ether;
-    uint256 public constant MAX_PER_WALLET = 2;
+    uint256 public constant MINT_PRICE = 0.18 ether;
+    uint256 public constant MAX_PER_WALLET_PER_PHASE = 2;
     uint64 public constant MINIMUM_TIME_STAKED_FOR_PREMIUM_REDEMPTION = 90 days;
 
-    uint256 public constant ALPHA_PASS = 1;
-    uint256 public constant PREMIUM_PASS = 2;
+    uint256 private constant ALPHA_PASS = 1;
+    uint256 private constant PREMIUM_PASS = 2;
 
     mapping(uint256 => uint256) public totalSupply;
     mapping(address => NumberMintedPerPhase) numberMinted;
@@ -57,15 +57,17 @@ contract LordsAlpha is ERC1155Guardable, Ownable {
     constructor(bytes32 _phaseOneWhitelistRoot, bytes32 _phaseTwoWhitelistRoot, uint64 startTime) ERC1155Guardable("QmHashLordsAlpha/") {
         phaseOneDetails = PhaseDetails(_phaseOneWhitelistRoot, startTime, startTime + 2 hours);
         phaseTwoDetails = PhaseDetails(_phaseTwoWhitelistRoot, phaseOneDetails.endTime, phaseOneDetails.endTime + 22 hours);
+        totalSupply[ALPHA_PASS] = 55;
+        _mint(msg.sender, ALPHA_PASS, 55, "");
     }
 
     function mintAllowlist(bytes32[] calldata proof, uint256 amount) external payable {
         if (block.timestamp < phaseOneDetails.startTime || block.timestamp >= phaseTwoDetails.endTime) revert AllowlistSaleNotActive();
         if (block.timestamp < phaseOneDetails.endTime) {
-            if (numberMinted[msg.sender].phaseOne + amount > MAX_PER_WALLET) revert ExceedMaxPerWallet();
+            if (numberMinted[msg.sender].phaseOne + amount > MAX_PER_WALLET_PER_PHASE) revert ExceedMaxPerWallet();
             numberMinted[msg.sender].phaseOne += uint8(amount);
         } else {
-            if (numberMinted[msg.sender].phaseTwo + amount > MAX_PER_WALLET) revert ExceedMaxPerWallet();
+            if (numberMinted[msg.sender].phaseTwo + amount > MAX_PER_WALLET_PER_PHASE) revert ExceedMaxPerWallet();
             numberMinted[msg.sender].phaseTwo += uint8(amount);
         }
 
@@ -76,7 +78,7 @@ contract LordsAlpha is ERC1155Guardable, Ownable {
 
     function mintPublic(uint256 amount) external payable {
         if (block.timestamp < phaseTwoDetails.endTime) revert PublicSaleNotStarted();
-        if (numberMinted[msg.sender].phaseThree + amount > MAX_PER_WALLET) revert ExceedMaxPerWallet();
+        if (numberMinted[msg.sender].phaseThree + amount > MAX_PER_WALLET_PER_PHASE) revert ExceedMaxPerWallet();
         numberMinted[msg.sender].phaseThree += uint8(amount);
 
         _mintAlpha(amount);
@@ -123,6 +125,10 @@ contract LordsAlpha is ERC1155Guardable, Ownable {
         phaseTwoDetails.root  = _root2;
     }
 
+    function bumpToFinalMaxSupply() external onlyOwner {
+        MAX_SUPPLY = FINAL_MAX_SUPPLY;
+    }
+
     function withdraw() external onlyOwner {
         (bool success, ) = msg.sender.call{value: address(this).balance}("");
         if (!success) revert WrongValueSent();
@@ -147,7 +153,7 @@ contract LordsAlpha is ERC1155Guardable, Ownable {
 
     function _mintAlpha(uint256 amount) internal {
         if (msg.value != MINT_PRICE * amount) revert WrongValueSent();
-        if (totalSupply[ALPHA_PASS] + amount > INITIAL_MAX_SUPPLY) revert ExceedMaxSupply();
+        if (totalSupply[ALPHA_PASS] + amount > MAX_SUPPLY) revert ExceedMaxSupply();
         totalSupply[ALPHA_PASS] += amount;
         _mint(msg.sender, ALPHA_PASS, amount, "");
     }
