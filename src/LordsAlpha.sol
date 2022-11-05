@@ -99,7 +99,7 @@ contract LordsAlpha is ERC1155Guardable, Ownable {
     }
 
     function redeemForPremium() external {
-        if (block.timestamp - stakeDetailsFor[msg.sender].stakingStart > MINIMUM_TIME_STAKED_FOR_PREMIUM_REDEMPTION) revert MinimumNotHit();
+        if (block.timestamp - stakeDetailsFor[msg.sender].stakingStart < MINIMUM_TIME_STAKED_FOR_PREMIUM_REDEMPTION) revert MinimumNotHit();
         if (stakeDetailsFor[msg.sender].numStaked < 2) revert NotEnoughStaked();
         stakeDetailsFor[msg.sender].numStaked -= 2;
         if (stakeDetailsFor[msg.sender].numStaked < 2) {

@@ -255,15 +255,15 @@ contract LordsAlphaTest is Test {
         testStake();
 
         changePrank(address(6));
-        vm.warp(1667019537 + 90 days);
+        vm.warp(1667019537 + 91 days);
         lordsalpha.redeemForPremium();
         (uint16 numStaked, uint64 timeStarted) = lordsalpha.stakeDetailsFor(address(6));
         assertEq(numStaked, 2);
-        assertEq(timeStarted, 1667019537 + 90 days);
+        assertEq(timeStarted, 1667019537 + 91 days);
         assertEq(lordsalpha.balanceOf(address(6), 2), 1);
         assertEq(lordsalpha.balanceOf(address(lordsalpha), 1), 6);
 
-        vm.warp(1667019537 + 180 days);
+        vm.warp(1667019537 + 181 days);
         lordsalpha.redeemForPremium();
         (uint16 numStaked2, uint64 timeStarted2) = lordsalpha.stakeDetailsFor(address(6));
         assertEq(numStaked2, 0);
