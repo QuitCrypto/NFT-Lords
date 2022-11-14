@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 import "../src/LordsAlpha.sol";
@@ -21,10 +21,16 @@ contract LordsAlphaTest is Test {
 
     uint32 startTime = 1666932588;
 
+    address[] _airdropAddresses;
+    uint256[] _counts;
+
     mapping(address => bool) seenAddresses;
 
     function setUp() public {
         lordsalpha = new LordsAlpha(root1, root2, startTime);
+        _airdropAddresses.push(address(this));
+        _counts.push(55);
+        lordsalpha.airdrop(_airdropAddresses,_counts);
     }
 
     function testInitialization() public {
@@ -274,13 +280,13 @@ contract LordsAlphaTest is Test {
 
     function testSetUri() public {
         string memory newUri = "ipfs://QmThisIsNew/";
-        assertEq(keccak256(abi.encodePacked("QmHashLordsAlpha/1.json")), keccak256(abi.encodePacked(lordsalpha.uri(1))));
+        assertEq(keccak256(abi.encodePacked("ipfs://QmQknSe1awZqKUJfTfHo2awHo9UFXkumC4egHRbjt76tKf/1")), keccak256(abi.encodePacked(lordsalpha.uri(1))));
         hoax(add1);
         vm.expectRevert(abi.encodePacked("Ownable: caller is not the owner"));
         lordsalpha.setUri(newUri);
         hoax(lordsalpha.owner());
         lordsalpha.setUri(newUri);
-        string memory expectedUri = "ipfs://QmThisIsNew/1.json";
+        string memory expectedUri = "ipfs://QmThisIsNew/1";
         assertEq(keccak256(abi.encodePacked(expectedUri)), keccak256(abi.encodePacked(lordsalpha.uri(1))));
     }
 

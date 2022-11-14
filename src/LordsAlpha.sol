@@ -3,7 +3,7 @@ import "openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "openzeppelin/contracts/access/Ownable.sol";
 import "Guardable/ERC1155Guardable.sol";
 
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.17;
 
 error WrongValueSent();
 error ExceedMaxPerWallet();
@@ -33,9 +33,10 @@ struct NumberMintedPerPhase {
 }
 
 contract LordsAlpha is ERC1155Guardable, Ownable {
-    /** @notice MAX_SUPPLY refers to the max supply that is available for the initial mint.
-      * the final max supply will be 777, and will be set at a later date. This transition from 555
-      * to 777 can happen only once, and the max supply can never exceed 777.
+    /** @notice MAX_SUPPLY refers to the max supply that is available for the initial mint. The team
+      * also has an airdroppable supply of 55 tokens. The final max supply will be 777, and will be set
+      * at a later date. This transition from 500 to 777 can happen only once, and the max supply can
+      * never exceed 777.
     **/
     uint256 public MAX_SUPPLY = 555;
     uint256 private constant FINAL_MAX_SUPPLY = 777;
@@ -54,11 +55,9 @@ contract LordsAlpha is ERC1155Guardable, Ownable {
     PhaseDetails public phaseOneDetails;
     PhaseDetails public phaseTwoDetails;
 
-    constructor(bytes32 _phaseOneWhitelistRoot, bytes32 _phaseTwoWhitelistRoot, uint64 startTime) ERC1155Guardable("QmHashLordsAlpha/") {
+    constructor(bytes32 _phaseOneWhitelistRoot, bytes32 _phaseTwoWhitelistRoot, uint64 startTime) ERC1155Guardable("ipfs://QmQknSe1awZqKUJfTfHo2awHo9UFXkumC4egHRbjt76tKf/") {
         phaseOneDetails = PhaseDetails(_phaseOneWhitelistRoot, startTime, startTime + 2 hours);
         phaseTwoDetails = PhaseDetails(_phaseTwoWhitelistRoot, phaseOneDetails.endTime, phaseOneDetails.endTime + 22 hours);
-        totalSupply[ALPHA_PASS] = 55;
-        _mint(msg.sender, ALPHA_PASS, 55, "");
     }
 
     function mintAllowlist(bytes32[] calldata proof, uint256 amount) external payable {
@@ -113,11 +112,23 @@ contract LordsAlpha is ERC1155Guardable, Ownable {
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
-        return string(abi.encodePacked(super.uri(tokenId), _toString(tokenId), ".json"));
+        return string(abi.encodePacked(super.uri(tokenId), _toString(tokenId)));
     }
 
     function setUri(string memory _uri) external onlyOwner {
         _setURI(_uri);
+    }
+
+    function airdrop(address[] calldata owners, uint[] calldata amounts) external onlyOwner {
+        if (owners.length != amounts.length) revert();
+
+        for (uint256 i = 0; i < owners.length; i++) {
+            uint256 amount = amounts[i];
+            if (totalSupply[ALPHA_PASS] + amount > FINAL_MAX_SUPPLY) revert ExceedMaxSupply();
+            totalSupply[ALPHA_PASS] += amount;
+
+            _mint(owners[i], ALPHA_PASS, amount, "");
+        }
     }
 
     function setRoots(bytes32 _root1, bytes32 _root2) external onlyOwner {
